@@ -4,18 +4,20 @@ defmodule HackerChat.Server do
   def start(_type, _args) do
     import Supervisor.Spec
 
+    opt = [ip: {0,0,0,0}, active: false]
+    {:ok, socket} = :gen_udp.open(4040, opt)
+
     children = [
       supervisor(Task.Supervisor, [[name: HackerChat.TaskSupervisor]]),
-      worker(Task, [HackerChat.Server, :accept, [4040]]),
-      #worker(Task, [Server, :broadcaster, [4040]], name: HackerChat.Broadcaster)
+      worker(Task, [HackerChat.Server, :accept, [socket]], id: HackerChat.Receiver),
+      #worker(Task, [HackerChat.Server, :broadcast, [socket]], id: HackerChat.Broadcaster)
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
+    broadcast(socket)
   end
 
-  def accept(port) do
-    opt = [ip: {0,0,0,0}, active: false]
-    {:ok, socket} = :gen_udp.open(port, opt)
+  def accept(socket) do
     loop_acceptor(socket)
   end
 
@@ -30,7 +32,15 @@ defmodule HackerChat.Server do
     IO.puts message
   end
 
-  def broadcaster(_port) do
-    {:ok}
+  def broadcast(socket) do
+    :inet.setopts(socket,[broadcast: true])
+    loop_broadcaster(socket)
+  end
+
+  def loop_broadcaster(socket) do
+    IO.puts "start broadcast loop"
+    message = IO.read(:line)
+    :gen_udp.send(socket, {255,255,255,255}, 4040, message)
+    loop_broadcaster(socket)
   end
 end
