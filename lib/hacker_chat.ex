@@ -1,0 +1,2 @@
+defmodule HackerChat do
+end
